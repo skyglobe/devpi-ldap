@@ -93,7 +93,7 @@ class LDAP(dict):
 
     def _validate_search_settings(self, configname):
         config = self[configname]
-        for key in ('base', 'filter', 'attribute_name'):
+        for key in ('base', 'filter'):
             if key not in config:
                 fatal("Required option '%s' not in LDAP '%s' config." % (
                     key, configname))
@@ -173,12 +173,26 @@ class LDAP(dict):
             return []
         search_filter = config['filter'].format(**kw)
         search_scope = self._search_scope(config)
-        attribute_name = config['attribute_name']
-        found = conn.search(
-            config['base'], search_filter,
-            search_scope=search_scope, attributes=[attribute_name])
+        attribute_name = config.get('attribute_name', None)
+        found = False
+        if not attribute_name or attribute_name == "":
+            attribute_name = None
+            found = conn.search(
+                config['base'], search_filter,
+                search_scope=search_scope)
+        else:
+            found = conn.search(
+                config['base'], search_filter,
+                search_scope=search_scope, attributes=[attribute_name])
         if found:
-            if any(attribute_name in x.get('attributes', {}) for x in conn.response):
+            if attribute_name is None:
+                def extract_search(s):
+                    _dn = s.get('dn')
+                    if _dn:
+                        return [_dn]
+                    else:
+                        return []
+            elif any(attribute_name in x.get('attributes', {}) for x in conn.response):
                 def extract_search(s):
                     if 'attributes' in s:
                         attributes = s['attributes'][attribute_name]
